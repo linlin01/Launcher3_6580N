@@ -1,5 +1,6 @@
 package com.android.launcher3;
 
+import android.appwidget.AppWidgetProviderInfo;
 import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Context;
@@ -35,6 +36,8 @@ import com.android.launcher3.util.SQLiteCacheHelper;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.widget.WidgetCell;
 
+import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -65,6 +68,12 @@ public class WidgetPreviewLoader {
     private final Context mContext;
     private final IconCache mIconCache;
     private final UserManagerCompat mUserManager;
+    //add lallapp code by zhaopenglin 20170313
+    private final HashMap<String, WeakReference<Bitmap>> mLoadedPreviews = new HashMap<>();
+    private int mPreviewBitmapWidth;
+    private int mPreviewBitmapHeight;
+    private PagedViewCellLayout mWidgetSpacingLayout;
+    //add lallapp code by zhaopenglin 20170313
     private final AppWidgetManagerCompat mWidgetManager;
     private final CacheDb mDb;
     private final int mProfileBadgeMargin;
@@ -100,6 +109,26 @@ public class WidgetPreviewLoader {
         return new PreviewLoadRequest(task);
     }
 
+//add lallapp code by zhaopenglin 20170313 start
+    public void recycleBitmap(Object o, Bitmap bitmapToRecycle) {
+        String name = getObjectName(o);
+        synchronized (mLoadedPreviews) {
+            if (mLoadedPreviews.containsKey(name)) {
+                Bitmap b = mLoadedPreviews.get(name).get();
+                if (b == bitmapToRecycle) {
+                    mLoadedPreviews.remove(name);
+                    if (bitmapToRecycle.isMutable()) {
+                        synchronized (mUnusedBitmaps) {
+//                            mUnusedBitmaps.add(new SoftReference<Bitmap>(b));
+                        }
+                    }
+                } else {
+                    throw new RuntimeException("Bitmap passed in doesn't match up");
+                }
+            }
+        }
+    }
+//add lallapp code by zhaopenglin 20170313 end
     /**
      * The DB holds the generated previews for various components. Previews can also have different
      * sizes (landscape vs portrait).
@@ -134,7 +163,31 @@ public class WidgetPreviewLoader {
                     ");");
         }
     }
+//add lallapp code by zhaopenglin 20170313 start
+    private static final String WIDGET_PREFIX = "Widget:";
+    private static final String SHORTCUT_PREFIX = "Shortcut:";
 
+    private static String getObjectName(Object o) {
+        // should cache the string builder
+        StringBuilder sb = new StringBuilder();
+        String output;
+        if (o instanceof AppWidgetProviderInfo) {
+            sb.append(WIDGET_PREFIX);
+            sb.append(((AppWidgetProviderInfo) o).toString());
+            output = sb.toString();
+            sb.setLength(0);
+        } else {
+            sb.append(SHORTCUT_PREFIX);
+
+            ResolveInfo info = (ResolveInfo) o;
+            sb.append(new ComponentName(info.activityInfo.packageName,
+                    info.activityInfo.name).flattenToString());
+            output = sb.toString();
+            sb.setLength(0);
+        }
+        return output;
+    }
+//add lallapp code by zhaopenglin 20170313 end
     private WidgetCacheKey getObjectKey(Object o, String size) {
         // should cache the string builder
         if (o instanceof LauncherAppWidgetProviderInfo) {
@@ -304,7 +357,17 @@ public class WidgetPreviewLoader {
                     (ResolveInfo) info, previewWidth, previewHeight, recycle);
         }
     }
+    //add lallapp code by zhaopenglin 20170313 start
+    public int maxWidthForWidgetPreview(int spanX) {
+        return Math.min(mPreviewBitmapWidth,
+                mWidgetSpacingLayout.estimateCellWidth(spanX));
+    }
 
+    public int maxHeightForWidgetPreview(int spanY) {
+        return Math.min(mPreviewBitmapHeight,
+                mWidgetSpacingLayout.estimateCellHeight(spanY));
+    }
+    //add lallapp code by zhaopenglin 20170313 end
     /**
      * Generates the widget preview from either the {@link AppWidgetManagerCompat} or cache
      * and add badge at the bottom right corner.

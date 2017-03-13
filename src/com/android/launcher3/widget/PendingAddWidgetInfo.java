@@ -16,6 +16,7 @@
 package com.android.launcher3.widget;
 
 import android.appwidget.AppWidgetHostView;
+import android.appwidget.AppWidgetProviderInfo;
 import android.os.Bundle;
 import android.os.Parcelable;
 

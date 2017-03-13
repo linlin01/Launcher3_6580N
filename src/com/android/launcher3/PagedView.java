@@ -62,7 +62,15 @@ import com.mediatek.launcher3.LauncherHelper;
 import com.mediatek.launcher3.LauncherLog;
 
 import java.util.ArrayList;
-
+//add lallapp code by zhaopenglin 20170313 start
+interface Page {
+    public int getPageChildCount();
+    public View getChildOnPageAt(int i);
+    public void removeAllViewsOnPage();
+    public void removeViewOnPageAt(int i);
+    public int indexOfChildOnPage(View v);
+}
+//add lallapp code by zhaopenglin 20170313 end
 /**
  * An abstraction of the original Workspace which supports browsing through a
  * sequential list of "pages"
@@ -153,6 +161,22 @@ public abstract class PagedView extends ViewGroup implements ViewGroup.OnHierarc
     protected boolean mCenterPagesVertically;
     protected boolean mAllowOverScroll = true;
     protected int[] mTempVisiblePagesRange = new int[2];
+//add lallapp code by zhaopenglin 20170313 start
+    protected int mCellCountX = 0;
+    protected int mCellCountY = 0;
+    protected boolean mForceDrawAllChildrenNextFrame;
+    private boolean mSpacePagesAutomatically = false;
+
+    protected ArrayList<Boolean> mDirtyPageContent;
+
+    // If true, syncPages and syncPageItems will be called to refresh pages
+    protected boolean mContentIsRefreshable = true;
+    // All syncs and layout passes are deferred until data is ready.
+    protected boolean mIsDataReady = false;
+
+    protected boolean mAllowLongPress = true;
+    private boolean mAllowPagedViewAnimations = true;
+//add lallapp code by zhaopenglin 20170313 end
 
     protected static final int INVALID_POINTER = -1;
 
@@ -250,6 +274,10 @@ public abstract class PagedView extends ViewGroup implements ViewGroup.OnHierarc
      * Initializes various states for this workspace.
      */
     protected void init() {
+        //add lallapp code by zhaopenglin 20170313 start
+        mDirtyPageContent = new ArrayList<Boolean>();
+        mDirtyPageContent.ensureCapacity(32);
+        //add lallapp code by zhaopenglin 20170313 end
         mScroller = new LauncherScroller(getContext());
         setDefaultInterpolator(new ScrollInterpolator());
         mCurrentPage = 0;
@@ -402,6 +430,20 @@ public abstract class PagedView extends ViewGroup implements ViewGroup.OnHierarc
         }
     }
 
+    /**
+    //add lallapp code by zhaopenglin 20170313 start
+    /**
+     * Called by subclasses to mark that data is ready, and that we can begin loading and laying
+     * out pages.
+     */
+    protected void setDataIsReady() {
+        mIsDataReady = true;
+    }
+
+    protected boolean isDataReady() {
+        return mIsDataReady;
+    }
+    //add lallapp code by zhaopenglin 20170313 end
     /**
      * Returns the index of the currently displayed page.
      */
@@ -867,7 +909,14 @@ public abstract class PagedView extends ViewGroup implements ViewGroup.OnHierarc
         }
         setMeasuredDimension(scaledWidthSize, scaledHeightSize);
     }
-
+    //add lallapp code by zhaopenglin 20170313 start
+    /**
+     * This method should be called once before first layout / measure pass.
+     */
+    protected void setSinglePageInViewport() {
+        mSpacePagesAutomatically = true;
+    }
+    //add lallapp code by zhaopenglin 20170313 end
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         if (getChildCount() == 0) {
@@ -1003,7 +1052,15 @@ public abstract class PagedView extends ViewGroup implements ViewGroup.OnHierarc
         mPageSpacing = pageSpacing;
         requestLayout();
     }
+    //add lallapp code by zhaopenglin 20170313 start
+    protected void enablePagedViewAnimations() {
+        mAllowPagedViewAnimations = true;
 
+    }
+    protected void disablePagedViewAnimations() {
+        mAllowPagedViewAnimations = false;
+    }
+    //add lallapp code by zhaopenglin 20170313 end
     /**
      * Called when the center screen changes during scrolling.
      */
@@ -2364,7 +2421,112 @@ public abstract class PagedView extends ViewGroup implements ViewGroup.OnHierarc
             }
         };
     }
+    //add lallapp code by zhaopenglin 20170313 start
+    protected void loadAssociatedPages(int page) {
+        loadAssociatedPages(page, false);
+    }
+    protected void loadAssociatedPages(int page, boolean immediateAndOnly) {
+        if (mContentIsRefreshable) {
+            final int count = getChildCount();
+            if (page < count) {
+                int lowerPageBound = getAssociatedLowerPageBound(page);
+                int upperPageBound = getAssociatedUpperPageBound(page);
+                if (DEBUG) Log.d(TAG, "loadAssociatedPages: " + lowerPageBound + "/"
+                        + upperPageBound);
+                // First, clear any pages that should no longer be loaded
+                for (int i = 0; i < count; ++i) {
+                    Page layout = (Page) getPageAt(i);
+                    if ((i < lowerPageBound) || (i > upperPageBound)) {
+                        if (layout.getPageChildCount() > 0) {
+                            layout.removeAllViewsOnPage();
+                        }
+                        mDirtyPageContent.set(i, true);
+                    }
+                }
+                // Next, load any new pages
+                for (int i = 0; i < count; ++i) {
+                    if ((i != page) && immediateAndOnly) {
+                        continue;
+                    }
+                    if (lowerPageBound <= i && i <= upperPageBound) {
+                        if (mDirtyPageContent.get(i)) {
+                            syncPageItems(i, (i == page) && immediateAndOnly);
+                            mDirtyPageContent.set(i, false);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
+    protected int getAssociatedLowerPageBound(int page) {
+        return Math.max(0, page - 1);
+    }
+    protected int getAssociatedUpperPageBound(int page) {
+        final int count = getChildCount();
+        return Math.min(page + 1, count - 1);
+    }
+
+    /**
+     * This method is called ONLY to synchronize the number of pages that the paged view has.
+     * To actually fill the pages with information, implement syncPageItems() below.  It is
+     * guaranteed that syncPageItems() will be called for a particular page before it is shown,
+     * and therefore, individual page items do not need to be updated in this method.
+     */
+    public abstract void syncPages();
+
+    /**
+     * This method is called to synchronize the items that are on a particular page.  If views on
+     * the page can be reused, then they should be updated within this method.
+     */
+    public abstract void syncPageItems(int page, boolean immediate);
+
+    protected void invalidatePageData() {
+        invalidatePageData(-1, false);
+    }
+    protected void invalidatePageData(int currentPage) {
+        invalidatePageData(currentPage, false);
+    }
+    protected void invalidatePageData(int currentPage, boolean immediateAndOnly) {
+        if (!mIsDataReady) {
+            return;
+        }
+
+        if (mContentIsRefreshable) {
+            // Force all scrolling-related behavior to end
+            forceFinishScroller();
+
+            // Update all the pages
+            syncPages();
+
+            // We must force a measure after we've loaded the pages to update the content width and
+            // to determine the full scroll width
+            measure(MeasureSpec.makeMeasureSpec(getMeasuredWidth(), MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(getMeasuredHeight(), MeasureSpec.EXACTLY));
+
+            // Set a new page as the current page if necessary
+            if (currentPage > -1) {
+                setCurrentPage(Math.min(getPageCount() - 1, currentPage));
+            }
+
+            // Mark each of the pages as dirty
+            final int count = getChildCount();
+            mDirtyPageContent.clear();
+            for (int i = 0; i < count; ++i) {
+                mDirtyPageContent.add(true);
+            }
+
+            // Load any pages that are necessary for the current window of views
+            loadAssociatedPages(mCurrentPage, immediateAndOnly);
+            requestLayout();
+        }
+        if (isPageMoving()) {
+            // If the page is moving, then snap it to the final position to ensure we don't get
+            // stuck between pages
+            snapToDestination();
+        }
+    }
+    //add lallapp code by zhaopenglin 20170313 end
     // Animate the drag view back to the original position
     private void animateDragViewToOriginalPosition() {
         if (mDragView != null) {

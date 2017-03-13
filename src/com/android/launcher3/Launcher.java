@@ -267,7 +267,18 @@ public class Launcher extends Activity
     private View mWidgetsButton;
 
     private SearchDropTargetBar mSearchDropTargetBar;
+    //add lallapp code by zhaopenglin 20170313 start
+    public AppsCustomizePagedView getmAppsCustomizeContent() {
+        return mAppsCustomizeContent;
+    }
 
+    public AppsCustomizeTabHost getmAppsCustomizeTabHost() {
+        return mAppsCustomizeTabHost;
+    }
+
+    private AppsCustomizeTabHost mAppsCustomizeTabHost;
+    private AppsCustomizePagedView mAppsCustomizeContent;
+    //add lallapp code by zhaopenglin 20170313 end
     // Main container view for the all apps screen.
     @Thunk AllAppsContainerView mAppsView;
 
@@ -1052,10 +1063,19 @@ public class Launcher extends Activity
             if (DEBUG_RESUME_TIME) {
                 startTimeCallbacks = System.currentTimeMillis();
             }
-
+            //add lallapp code by zhaopenglin 20170313 start
+            if (mAppsCustomizeContent != null) {
+                mAppsCustomizeContent.setBulkBind(true);
+            }
+            //add lallapp code by zhaopenglin 20170313 end
             for (int i = 0; i < mBindOnResumeCallbacks.size(); i++) {
                 mBindOnResumeCallbacks.get(i).run();
             }
+            //add lallapp code by zhaopenglin 20170313 start
+            if (mAppsCustomizeContent != null) {
+                mAppsCustomizeContent.setBulkBind(false);
+            }
+            //add lallapp code by zhaopenglin 20170313 end
             mBindOnResumeCallbacks.clear();
             if (DEBUG_RESUME_TIME) {
                 Log.d(TAG, "Time spent processing callbacks in onResume: " +
@@ -1238,7 +1258,11 @@ public class Launcher extends Activity
             mModel.stopLoader();
         }
         //TODO(hyunyoungs): stop the widgets loader when there is a rotation.
-
+        //add lallapp code by zhaopenglin 20170313 start
+        if (mAppsCustomizeContent != null) {
+            mAppsCustomizeContent.surrender();
+        }
+        //add lallapp code by zhaopenglin 20170313 end
         return Boolean.TRUE;
     }
 
@@ -1388,6 +1412,20 @@ public class Launcher extends Activity
             setWaitingForResult(true);
             mRestoring = true;
         }
+        //add lallapp code by zhaopenglin 20170313 start
+        // Restore the AppsCustomize tab
+        if (mAppsCustomizeTabHost != null) {
+            String curTab = savedState.getString("apps_customize_currentTab");
+            if (curTab != null) {
+                mAppsCustomizeTabHost.setContentTypeImmediate(mAppsCustomizeTabHost.getContentTypeForTabTag(curTab));
+                mAppsCustomizeContent.loadAssociatedPages(mAppsCustomizeContent.getCurrentPage());
+            }
+
+            int currentIndex = savedState.getInt("apps_customize_currentIndex");
+            mAppsCustomizeContent.restorePageForIndex(currentIndex);
+        }
+//        mItemIdToViewId = (HashMap<Integer, Integer>) savedState.getSerializable(RUNTIME_STATE_VIEW_IDS);
+        //add lallapp code by zhaopenglin 20170313 end
     }
 
     /**
@@ -1433,6 +1471,12 @@ public class Launcher extends Activity
         // Setup Apps and Widgets
         mAppsView = (AllAppsContainerView) findViewById(R.id.apps_view);
         mWidgetsView = (WidgetsContainerView) findViewById(R.id.widgets_view);
+        //add lallapp code by zhaopenglin 20170313 start
+        if(LauncherAppState.isLRAllApp()){
+            mAppsView.setVisibility(View.GONE);
+            mWidgetsView.setVisibility(View.GONE);
+        }
+        //add lallapp code by zhaopenglin 20170313 end
         if (mLauncherCallbacks != null && mLauncherCallbacks.getAllAppsSearchBarController() != null) {
             mAppsView.setSearchBarController(mLauncherCallbacks.getAllAppsSearchBarController());
         } else {
@@ -1510,6 +1554,13 @@ public class Launcher extends Activity
         }
 
         mOverviewPanel.setAlpha(0f);
+        //add lallapp code by zhaopenglin 20170313 start
+        // Setup AppsCustomize
+        mAppsCustomizeTabHost = (AppsCustomizeTabHost) findViewById(R.id.apps_customize_pane);
+        mAppsCustomizeContent =
+                (AppsCustomizePagedView) mAppsCustomizeTabHost.findViewById(R.id.apps_customize_pane_content);
+        mAppsCustomizeContent.setup(this, mDragController);
+        //add lallapp code by zhaopenglin 20170313 end
     }
 
     /**
@@ -1616,7 +1667,24 @@ public class Launcher extends Activity
                     isWorkspaceLocked());
         }
     }
+    //add lallapp code by zhaopenglin 20170313 start
+    static int[] getSpanForWidget(Context context, ComponentName component, int minWidth, int minHeight) {
+        Rect padding = AppWidgetHostView.getDefaultPaddingForWidget(context, component, null);
+        // We want to account for the extra amount of padding that we are adding to the widget
+        // to ensure that it gets the full amount of space that it has requested
+        int requiredWidth = minWidth + padding.left + padding.right;
+        int requiredHeight = minHeight + padding.top + padding.bottom;
+        return null;//CellLayout.rectToCell(requiredWidth, requiredHeight, null);
+    }
 
+    static int[] getSpanForWidget(Context context, AppWidgetProviderInfo info) {
+        return getSpanForWidget(context, info.provider, info.minWidth, info.minHeight);
+    }
+
+    static int[] getMinSpanForWidget(Context context, AppWidgetProviderInfo info) {
+        return getSpanForWidget(context, info.provider, info.minResizeWidth, info.minResizeHeight);
+    }
+    //add lallapp code by zhaopenglin 20170313 end
     /**
      * Add a widget to the workspace.
      *
@@ -1774,6 +1842,7 @@ public class Launcher extends Activity
         // you're in All Apps and click home to go to the workspace. onWindowVisibilityChanged
         // is a more appropriate event to handle
         if (mVisible) {
+            mAppsCustomizeTabHost.onWindowVisible();//add lallapp code by zhaopenglin 20170313
             if (!mWorkspaceLoading) {
                 final ViewTreeObserver observer = mWorkspace.getViewTreeObserver();
                 // We want to let Launcher draw itself at least once before we force it to build
@@ -1988,7 +2057,12 @@ public class Launcher extends Activity
             if (!alreadyOnHome && mAppsView != null) {
                 mAppsView.scrollToTop();
             }
-
+            //add lallapp code by zhaopenglin 20170313 start
+            // Reset the apps customize page
+            if (!alreadyOnHome && mAppsCustomizeTabHost != null) {
+                mAppsCustomizeTabHost.reset();
+            }
+            //add lallapp code by zhaopenglin 20170313 end
             // Reset the widgets view
             if (!alreadyOnHome && mWidgetsView != null) {
                 mWidgetsView.scrollToTop();
@@ -2079,6 +2153,18 @@ public class Launcher extends Activity
             outState.putInt(RUNTIME_STATE_PENDING_ADD_WIDGET_ID, mPendingAddWidgetId);
         }
 
+        //add lallapp code by zhaopenglin 20170313 start
+        // Save the current AppsCustomize tab
+        if (mAppsCustomizeTabHost != null) {
+            AppsCustomizePagedView.ContentType type = mAppsCustomizeContent.getContentType();
+            String currentTabTag = mAppsCustomizeTabHost.getTabTagForContentType(type);
+            if (currentTabTag != null) {
+                outState.putString("apps_customize_currentTab", currentTabTag);
+            }
+            int currentIndex = mAppsCustomizeContent.getSaveInstanceStateIndex();
+            outState.putInt("apps_customize_currentIndex", currentIndex);
+        }
+        //add lallapp code by zhaopenglin 20170313 end
         // Save the current widgets tray?
         // TODO(hyunyoungs)
 
@@ -3514,6 +3600,11 @@ public class Launcher extends Activity
             // This clears all widget bitmaps from the widget tray
             // TODO(hyunyoungs)
         }
+        //add lallapp code by zhaopenglin 20170313 start
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE) {
+            mAppsCustomizeTabHost.onTrimMemory();
+        }
+        //add lallapp code by zhaopenglin 20170313 end
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.onTrimMemory(level);
         }
@@ -4121,6 +4212,11 @@ public class Launcher extends Activity
         if (addedApps != null && mAppsView != null) {
             mAppsView.addApps(addedApps);
         }
+        //add lallapp code by zhaopenglin 20170313 start
+        if (addedApps != null && mAppsCustomizeContent != null) {
+            mAppsCustomizeContent.addApps(addedApps);
+        }
+        //add lallapp code by zhaopenglin 20170313 end
     }
 
     /**
@@ -4571,6 +4667,11 @@ public class Launcher extends Activity
         if (mAppsView != null) {
             mAppsView.setApps(apps);
         }
+        //add lallapp code by zhaopenglin 20170313 start
+        if (mAppsCustomizeContent != null) {
+            mAppsCustomizeContent.setApps(apps);
+        }
+        //add lallapp code by zhaopenglin 20170313 end
         if (mLauncherCallbacks != null) {
             mLauncherCallbacks.bindAllApplications(apps);
         }
@@ -4621,6 +4722,7 @@ public class Launcher extends Activity
                 }
                 mAppsView.updateApps(apps);
          }
+        mAppsCustomizeContent.updateApps(apps);//add lallapp code by zhaopenglin 20170313
 
     }
 
@@ -4733,6 +4835,12 @@ public class Launcher extends Activity
         if (mAppsView != null) {
             mAppsView.removeApps(appInfos);
         }
+        //add lallapp code by zhaopenglin 20170313 start
+        // Update LAllApps
+        if(mAppsCustomizeContent != null) {
+            mAppsCustomizeContent.removeApps(appInfos);
+        }
+        //add lallapp code by zhaopenglin 20170313 end
     }
 
     private Runnable mBindWidgetModelRunnable = new Runnable() {
@@ -4753,6 +4861,7 @@ public class Launcher extends Activity
 
         if (mWidgetsView != null && model != null) {
             mWidgetsView.addWidgets(model);
+            mAppsCustomizeContent.onPackagesUpdated(model);//add lallapp code by zhaopenglin 20170313
             mWidgetsModel = null;
         }
     }
@@ -5082,7 +5191,11 @@ public class Launcher extends Activity
         Log.d(TAG, "sFolders.size=" + sFolders.size());
         mModel.dumpState();
         // TODO(hyunyoungs): add mWidgetsView.dumpState(); or mWidgetsModel.dumpState();
-
+//add lallapp code by zhaopenglin 20170313 start
+        if (mAppsCustomizeContent != null) {
+            mAppsCustomizeContent.dumpState();
+        }
+//add lallapp code by zhaopenglin 20170313 end
         Log.d(TAG, "END launcher3 dump state");
     }
 

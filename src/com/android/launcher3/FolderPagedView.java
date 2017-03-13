@@ -702,4 +702,15 @@ public class FolderPagedView extends PagedView {
         pos[0] = 0;
         pos[1] = getViewportHeight();
     }
+    //add lallapp code by zhaopenglin 20170313 start
+    @Override
+    public void syncPages() {
+
+    }
+
+    @Override
+    public void syncPageItems(int page, boolean immediate) {
+
+    }
+    //add lallapp code by zhaopenglin 20170313 end
 }

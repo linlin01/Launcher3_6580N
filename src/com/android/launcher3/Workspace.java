@@ -328,6 +328,8 @@ public class Workspace extends PagedView
 
         mOutlineHelper = HolographicOutlineHelper.obtain(context);
 
+        // With workspace, data is available straight from the get-go
+        setDataIsReady();//add lallapp code by zhaopenglin 20170313
         mLauncher = (Launcher) context;
         mStateTransitionAnimation = new WorkspaceStateTransitionAnimation(mLauncher, this);
         final Resources res = getResources();
@@ -4360,6 +4362,18 @@ public class Workspace extends PagedView
             openFolder.completeDragExit();
         }
     }
+
+    //add lallapp code by zhaopenglin 20170313 start
+    @Override
+    public void syncPages() {
+
+    }
+
+    @Override
+    public void syncPageItems(int page, boolean immediate) {
+
+    }
+    //add lallapp code by zhaopenglin 20170313 end
 
     @Override
     public boolean onEnterScrollArea(int x, int y, int direction) {

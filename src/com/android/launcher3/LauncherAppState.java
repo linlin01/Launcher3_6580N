@@ -17,6 +17,7 @@
 package com.android.launcher3;
 
 import android.app.SearchManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -179,4 +180,22 @@ public class LauncherAppState {
     public static boolean isDogfoodBuild() {
         return FeatureFlags.IS_ALPHA_BUILD || FeatureFlags.IS_DEV_BUILD;
     }
+//add lallapp code by zhaopenglin 20170313 start 
+    public static boolean isLRAllApp(){
+        return true;
+//        return false;
+    }
+
+    public static boolean isLAllappWhiteBG(){
+        return false;
+    }
+
+    public static boolean isDisableAllApps(){
+        return false;
+    }
+
+    boolean shouldShowAppOrWidgetProvider(ComponentName componentName) {
+        return mAppFilter == null || mAppFilter.shouldShowApp(componentName);
+    }
+    //add lallapp code by zhaopenglin 20170313 end
 }
